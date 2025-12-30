@@ -18,76 +18,72 @@ const createOrder = async (data) => {
   return result;
 };
 
+// Update an existing order
 const updateOrder = async (uuid, data) => {
-   
-   const updates = [];
-   const values = [];
-   
-   if (data.status !== undefined) {
-       updates.push('status = ?');
-       values.push(data.status);
-   }
-   
-   if (data.amount !== undefined) {
-       updates.push('amount = ?');
-       values.push(data.amount);
-   }
-   
-   if (updates.length === 0) {
-       throw new Error('No fields to update');
-   }
-   
-   const sql = `UPDATE orders SET ${updates.join(', ')} WHERE order_uuid = ?`;
-   values.push(uuid);
-   
-   const [result] = await database.execute(sql, values);
-
-   return result;
+  // Check if updating status
+  if (data.status && data.amount) {
+    const sql = "UPDATE orders SET status = ?, amount = ? WHERE order_uuid = ?";
+    const [result] = await database.execute(sql, [
+      data.status,
+      data.amount,
+      uuid,
+    ]);
+    return result;
+  } else if (data.status) {
+    const sql = "UPDATE orders SET status = ? WHERE order_uuid = ?";
+    const [result] = await database.execute(sql, [data.status, uuid]);
+    return result;
+  } else if (data.amount) {
+    const sql = "UPDATE orders SET amount = ? WHERE order_uuid = ?";
+    const [result] = await database.execute(sql, [data.amount, uuid]);
+    return result;
+  }
 };
 
+// Receive order from other server
 const syncOrder = async (data) => {
-
-    if (!data.user_id) {
-    
-        const updates = [];
-        const values = [];
-        
-        if (data.status !== undefined) {
-            updates.push('status = ?');
-            values.push(data.status);
-        }
-        
-        if (data.amount !== undefined) {
-            updates.push('amount = ?');
-            values.push(data.amount);
-        }
-        
-        // Always set synced = 1
-        updates.push('synced = 1');
-        
-        const sql = `UPDATE orders SET ${updates.join(', ')} WHERE order_uuid = ?`;
-        values.push(data.order_uuid);
-        
-        await database.execute(sql, values);
-        console.log(`Updated order ${data.order_uuid}`);
-    } else {
-        const sql = `INSERT INTO orders (order_uuid, user_id, amount, status, source_server, synced) VALUES (?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE status = VALUES(status), amount = VALUES(amount), synced = 1`;
-        await database.execute(sql, [
-            data.order_uuid,
-            data.user_id,
-            data.amount,
-            data.status,
-            data.source_server,
-            data.synced,
-        ]);
-        console.log(`order ${data.order_uuid}`);
+  // If no user_id, it means this is an update
+  if (!data.user_id) {
+    // Update existing order
+    if (data.status && data.amount) {
+      const sql =
+        "UPDATE orders SET status = ?, amount = ?, synced = 1 WHERE order_uuid = ?";
+      await database.execute(sql, [data.status, data.amount, data.order_uuid]);
+    } else if (data.status) {
+      const sql =
+        "UPDATE orders SET status = ?, synced = 1 WHERE order_uuid = ?";
+      await database.execute(sql, [data.status, data.order_uuid]);
+    } else if (data.amount) {
+      const sql =
+        "UPDATE orders SET amount = ?, synced = 1 WHERE order_uuid = ?";
+      await database.execute(sql, [data.amount, data.order_uuid]);
     }
+    console.log("Order updated:", data.order_uuid);
+  } else {
+    // New order - insert or update if exists
+    const sql = `INSERT INTO orders (order_uuid, user_id, amount, status, source_server, synced) 
+                     VALUES (?, ?, ?, ?, ?, ?) 
+                     ON DUPLICATE KEY UPDATE status = ?, amount = ?, synced = 1`;
+
+    await database.execute(sql, [
+      data.order_uuid,
+      data.user_id,
+      data.amount,
+      data.status,
+      data.source_server,
+      data.synced,
+      data.status,
+      data.amount,
+    ]);
+    console.log("Order synced:", data.order_uuid);
+  }
 };
 
 const findByUuid = async (uuid) => {
-  const [rows] = await database.execute("SELECT * FROM orders WHERE order_uuid = ?", [
-    uuid,
-  ]);
+  const [rows] = await database.execute(
+    "SELECT * FROM orders WHERE order_uuid = ?",
+    [uuid]
+  );
   return rows[0];
 };
 
