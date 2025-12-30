@@ -46,9 +46,9 @@ const updateOrder = async (uuid, data) => {
 };
 
 const syncOrder = async (data) => {
-
-    if (!data.user_id) {
     
+    if (!data.user_id) {
+      
         const updates = [];
         const values = [];
         
