@@ -5,12 +5,22 @@ const orderModel = require('../models/order_model');
 const placeOrder = async (req, res) => {
     try {
 
-        if (!req.body.user_id || !req.body.amount) {
+        
+        if (!req.body.user_id) {
             return res.status(400).json({
                 success: false,
-                message: "user_id, amount are required"
+                message: "user_id is required"
             });
         }
+
+        if (!req.body.amount && !req.body.product_ids) {
+            console.log(" Validation failed: No amount or product_ids");
+            return res.status(400).json({
+                success: false,
+                message: "Either amount or product_ids is required"
+            });
+        }
+        
         const result = await orderService.createOrder(req.body);
 
         res.status(200).json({
